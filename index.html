@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Chess.com</title>
+    <title>Dashboard d'Analyse Chess.com</title>
     <style>
-        /* CSS pour le nouveau look du dashboard */
+        /* CSS pour le look du dashboard */
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
         
         body {
@@ -24,6 +24,9 @@
             max-width: 800px;
             text-align: center;
         }
+        h1 {
+            font-size: 2.2em;
+        }
         .search-box {
             margin-bottom: 2em;
         }
@@ -34,6 +37,7 @@
             width: 250px;
             background-color: #444;
             color: #fff;
+            font-size: 1em;
         }
         button {
             padding: 12px 20px;
@@ -44,12 +48,19 @@
             font-weight: bold;
             cursor: pointer;
             margin-left: 10px;
+            font-size: 1em;
+        }
+        #status {
+            margin-top: 1.5em;
+            font-size: 1.1em;
+            min-height: 25px; /* Pour éviter que la page ne saute quand le texte change */
         }
         .dashboard {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 20px;
             margin-top: 20px;
+            text-align: left;
         }
         .card {
             background-color: #262421;
@@ -62,15 +73,15 @@
             color: #9c9c9c;
             text-transform: uppercase;
         }
-        .elo {
-            font-size: 2.5em;
-            font-weight: 700;
-            color: #fff;
-            margin: 10px 0;
-        }
-        .game-count {
-            font-size: 0.9em;
-            color: #9c9c9c;
+        /* Style pour les résultats qui seront affichés */
+        #results-display {
+             background-color: #262421;
+             border-radius: 10px;
+             padding: 20px;
+             margin-top: 20px;
+             text-align: left;
+             font-family: monospace;
+             white-space: pre-wrap; /* Pour afficher le JSON formaté */
         }
         .hidden {
             display: none;
@@ -79,79 +90,91 @@
 </head>
 <body>
     <div class="container">
-      <h1>Dashboard Chess.com</h1>
+      <h1>Analyse Complète de Parties Chess.com</h1>
       <div class="search-box">
           <input type="text" id="username-input" placeholder="Entrez un pseudo..." value="Lwatch">
-          <button id="search-button">Analyser</button>
+          <button id="search-button">Lancer l'analyse complète</button>
       </div>
+      
       <h2 id="status"></h2>
       
-      <div id="dashboard" class="dashboard hidden">
-          <div class="card">
-              <h3>Rapide</h3>
-              <div id="rapid-elo" class="elo">...</div>
-              <div id="rapid-games" class="game-count">... parties</div>
-          </div>
-          <div class="card">
-              <h3>Blitz</h3>
-              <div id="blitz-elo" class="elo">...</div>
-              <div id="blitz-games" class="game-count">... parties</div>
-          </div>
-          <div class="card">
-              <h3>Bullet</h3>
-              <div id="bullet-elo" class="elo">...</div>
-              <div id="bullet-games" class="game-count">... parties</div>
-          </div>
-           <div class="card">
-              <h3>Quotidien</h3>
-              <div id="daily-elo" class="elo">...</div>
-              <div id="daily-games" class="game-count">... parties</div>
-          </div>
-      </div>
+      <div id="results-display" class="hidden"></div>
     </div>
 
     <script>
       const usernameInput = document.getElementById('username-input');
       const searchButton = document.getElementById('search-button');
       const statusElement = document.getElementById('status');
-      const dashboardElement = document.getElementById('dashboard');
+      const resultsDisplay = document.getElementById('results-display');
+
+      let pollingInterval; // Pour garder une référence à notre vérificateur périodique
 
       searchButton.addEventListener('click', () => {
         const username = usernameInput.value.trim();
-        if (username) getStatsForPlayer(username);
+        if (username) {
+            startAnalysis(username);
+        }
       });
 
-      async function getStatsForPlayer(username) {
-        statusElement.textContent = `Analyse en cours pour "${username}"...`;
-        dashboardElement.classList.add('hidden');
+      async function startAnalysis(username) {
+        // Réinitialiser l'interface
+        statusElement.textContent = `Demande d'analyse pour "${username}" envoyée...`;
+        resultsDisplay.classList.add('hidden');
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
 
         try {
-          const response = await fetch(`/.netlify/functions/getStats?username=${username}`);
-          const data = await response.json();
-          if (data.error) throw new Error(data.error);
-          
-          displayDashboard(data, username);
+            // On appelle notre première fonction pour démarrer la tâche
+            const response = await fetch('/.netlify/functions/start-analysis', {
+                method: 'POST',
+                body: JSON.stringify({ username })
+            });
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            // On a reçu le jobId, on commence à vérifier le statut toutes les 5 secondes
+            const shortJobId = data.jobId.substring(0, 8);
+            statusElement.textContent = `Analyse en arrière-plan démarrée... (ID: ${shortJobId})`;
+            pollingInterval = setInterval(() => checkStatus(data.jobId), 5000);
+
         } catch (error) {
-          statusElement.textContent = `Erreur : ${error.message}`;
+            statusElement.textContent = `Erreur lors du lancement : ${error.message}`;
         }
       }
 
-      function displayDashboard(data, username) {
-        statusElement.textContent = ``; // On efface le statut pour afficher le dashboard
-        dashboardElement.classList.remove('hidden');
+      async function checkStatus(jobId) {
+        try {
+            const response = await fetch(`/.netlify/functions/check-status?jobId=${jobId}`);
+            const data = await response.json();
 
-        // On remplit chaque carte avec les données reçues
-        document.getElementById('rapid-elo').textContent = data.elo.rapid;
-        document.getElementById('rapid-games').textContent = `${data.games.rapid} parties`;
+            if (!response.ok) {
+                throw new Error(data.error || "Impossible de vérifier le statut.");
+            }
 
-        document.getElementById('blitz-elo').textContent = data.elo.blitz;
-        document.getElementById('blitz-games').textContent = `${data.games.blitz} parties`;
+            if (data.status === 'completed') {
+                clearInterval(pollingInterval);
+                statusElement.textContent = "Analyse terminée ! Voici les résultats :";
+                // Affiche les résultats formatés dans la zone prévue
+                resultsDisplay.textContent = JSON.stringify(data.results, null, 2);
+                resultsDisplay.classList.remove('hidden');
 
-        document.getElementById('bullet-elo').textContent = data.elo.bullet;
-        document.getElementById('bullet-games').textContent = `${data.games.bullet} parties`;
-          
-        document.getElementById('daily-elo').textContent = data.elo.daily;
-        document.getElementById('daily-games').textContent = `${data.games.daily} parties`;
+            } else if (data.status === 'failed') {
+                clearInterval(pollingInterval);
+                statusElement.textContent = `L'analyse a échoué. Raison : ${data.results.error}`;
+            
+            } else {
+                // Si le statut est "pending" ou "running", on continue d'attendre
+                statusElement.textContent = `Analyse en cours... (Statut : ${data.status})`;
+                console.log(`Statut actuel : ${data.status}`);
+            }
+        } catch (error) {
+            clearInterval(pollingInterval);
+            statusElement.textContent = `Erreur lors de la vérification : ${error.message}`;
+        }
       }
     </script>
 </body>
