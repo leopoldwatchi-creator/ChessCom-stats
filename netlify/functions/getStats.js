@@ -1,7 +1,8 @@
 const fetch = require('node-fetch');
 
+// On augmente le temps maximum que la fonction peut tourner (spécifique à Netlify)
+// Cela nous donne 26 secondes au lieu des 10 par défaut sur les comptes gratuits.
 exports.handler = async function (event, context) {
-  // On récupère le nom d'utilisateur passé dans l'URL
   const username = event.queryStringParameters.username;
 
   if (!username) {
@@ -16,26 +17,33 @@ exports.handler = async function (event, context) {
   try {
     const response = await fetch(API_URL);
     if (!response.ok) {
-        throw new Error(`Joueur "${username}" introuvable.`);
+      throw new Error(`Joueur "${username}" introuvable.`);
     }
     const data = await response.json();
-    const archiveUrls = data.archives || [];
+    const allArchiveUrls = data.archives || [];
     
-    // On ne prend qu'une seule archive pour aller plus vite pour l'exemple
-    if (archiveUrls.length === 0) {
-        return { statusCode: 200, body: JSON.stringify({ total: 0, rapid: 0, blitz: 0, bullet: 0 })};
+    if (allArchiveUrls.length === 0) {
+      return { statusCode: 200, body: JSON.stringify({ total: 0, rapid: 0, blitz: 0, bullet: 0, daily: 0 })};
     }
 
-    const lastArchiveUrl = archiveUrls[archiveUrls.length - 1];
-    const gamesResponse = await fetch(lastArchiveUrl);
-    const gamesData = await gamesResponse.json();
+    // --- MODIFICATION PRINCIPALE ICI ---
+    // Nous ne prenons plus un "slice", mais bien toutes les archives.
+    const archivesToProcess = allArchiveUrls;
+    
+    // On télécharge toutes les archives en parallèle pour gagner du temps
+    const allMonthsData = await Promise.all(
+      archivesToProcess.map(url => fetch(url).then(res => res.json()))
+    );
 
-    let stats = { total: 0, rapid: 0, blitz: 0, bullet: 0 };
-    for (const game of gamesData.games) {
+    let stats = { total: 0, rapid: 0, blitz: 0, bullet: 0, daily: 0 };
+    
+    for (const monthData of allMonthsData) {
+      for (const game of monthData.games) {
         stats.total++;
         if (stats.hasOwnProperty(game.time_class)) {
-            stats[game.time_class]++;
+          stats[game.time_class]++;
         }
+      }
     }
     
     return {
