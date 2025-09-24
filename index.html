@@ -3,30 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyseur Chess.com</title>
+    <title>Dashboard Chess.com</title>
     <style>
-      /* J'ai mis le CSS directement ici pour simplifier */
-      body { font-family: sans-serif; background-color: #333; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; }
-      .container { background-color: #262421; padding: 2em; border-radius: 10px; }
-      .hidden { display: none; }
-      .stat-item { display: flex; justify-content: space-between; padding: 0.5em 0; border-bottom: 1px solid #444; }
-      button { padding: 10px 15px; margin-left: 10px; cursor: pointer; }
-      input { padding: 10px; }
+        /* CSS pour le nouveau look du dashboard */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+        
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #312e2b;
+            color: #e6e6e6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        .search-box {
+            margin-bottom: 2em;
+        }
+        input {
+            padding: 12px;
+            border-radius: 5px;
+            border: none;
+            width: 250px;
+            background-color: #444;
+            color: #fff;
+        }
+        button {
+            padding: 12px 20px;
+            border-radius: 5px;
+            border: none;
+            background-color: #81b64c;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .card {
+            background-color: #262421;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #9c9c9c;
+            text-transform: uppercase;
+        }
+        .elo {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #fff;
+            margin: 10px 0;
+        }
+        .game-count {
+            font-size: 0.9em;
+            color: #9c9c9c;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-      <h1>Statistiques Chess.com</h1>
+      <h1>Dashboard Chess.com</h1>
       <div class="search-box">
           <input type="text" id="username-input" placeholder="Entrez un pseudo..." value="Lwatch">
           <button id="search-button">Analyser</button>
       </div>
       <h2 id="status"></h2>
-      <div id="results" class="hidden">
-        <div class="stat-item"><span>Parties totales :</span><span id="total-games"></span></div>
-        <div class="stat-item"><span>Rapides :</span><span id="rapid-games"></span></div>
-        <div class="stat-item"><span>Blitz :</span><span id="blitz-games"></span></div>
-        <div class="stat-item"><span>Bullet :</span><span id="bullet-games"></span></div>
+      
+      <div id="dashboard" class="dashboard hidden">
+          <div class="card">
+              <h3>Rapide</h3>
+              <div id="rapid-elo" class="elo">...</div>
+              <div id="rapid-games" class="game-count">... parties</div>
+          </div>
+          <div class="card">
+              <h3>Blitz</h3>
+              <div id="blitz-elo" class="elo">...</div>
+              <div id="blitz-games" class="game-count">... parties</div>
+          </div>
+          <div class="card">
+              <h3>Bullet</h3>
+              <div id="bullet-elo" class="elo">...</div>
+              <div id="bullet-games" class="game-count">... parties</div>
+          </div>
+           <div class="card">
+              <h3>Quotidien</h3>
+              <div id="daily-elo" class="elo">...</div>
+              <div id="daily-games" class="game-count">... parties</div>
+          </div>
       </div>
     </div>
 
@@ -34,34 +114,45 @@
       const usernameInput = document.getElementById('username-input');
       const searchButton = document.getElementById('search-button');
       const statusElement = document.getElementById('status');
-      const resultsElement = document.getElementById('results');
+      const dashboardElement = document.getElementById('dashboard');
 
-      searchButton.addEventListener('click', async () => {
+      searchButton.addEventListener('click', () => {
         const username = usernameInput.value.trim();
-        if (!username) return;
+        if (username) getStatsForPlayer(username);
+      });
 
+      async function getStatsForPlayer(username) {
         statusElement.textContent = `Analyse en cours pour "${username}"...`;
-        resultsElement.classList.add('hidden');
+        dashboardElement.classList.add('hidden');
 
         try {
-          // IMPORTANT : On appelle notre propre fonction, pas l'API de Chess.com
           const response = await fetch(`/.netlify/functions/getStats?username=${username}`);
           const data = await response.json();
-
           if (data.error) throw new Error(data.error);
           
-          // Affichage des résultats
-          statusElement.textContent = `Statistiques pour "${username}"`;
-          document.getElementById('total-games').textContent = data.total;
-          document.getElementById('rapid-games').textContent = data.rapid;
-          document.getElementById('blitz-games').textContent = data.blitz;
-          document.getElementById('bullet-games').textContent = data.bullet;
-          resultsElement.classList.remove('hidden');
-
+          displayDashboard(data, username);
         } catch (error) {
           statusElement.textContent = `Erreur : ${error.message}`;
         }
-      });
+      }
+
+      function displayDashboard(data, username) {
+        statusElement.textContent = ``; // On efface le statut pour afficher le dashboard
+        dashboardElement.classList.remove('hidden');
+
+        // On remplit chaque carte avec les données reçues
+        document.getElementById('rapid-elo').textContent = data.elo.rapid;
+        document.getElementById('rapid-games').textContent = `${data.games.rapid} parties`;
+
+        document.getElementById('blitz-elo').textContent = data.elo.blitz;
+        document.getElementById('blitz-games').textContent = `${data.games.blitz} parties`;
+
+        document.getElementById('bullet-elo').textContent = data.elo.bullet;
+        document.getElementById('bullet-games').textContent = `${data.games.bullet} parties`;
+          
+        document.getElementById('daily-elo').textContent = data.elo.daily;
+        document.getElementById('daily-games').textContent = `${data.games.daily} parties`;
+      }
     </script>
 </body>
 </html>
