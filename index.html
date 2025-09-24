@@ -117,35 +117,38 @@
       });
 
      async function startAnalysis(username) {
-        // Réinitialiser l'interface
-        statusElement.textContent = `Demande d'analyse pour "${username}" envoyée...`;
-        resultsDisplay.classList.add('hidden');
-        if (pollingInterval) {
-            clearInterval(pollingInterval);
+    // Réinitialiser l'interface
+    statusElement.textContent = `Demande d'analyse pour "${username}" envoyée...`;
+    resultsDisplay.classList.add('hidden');
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+
+    try {
+        const response = await fetch('/.netlify/functions/start-analysis', {
+            method: 'POST',
+            body: JSON.stringify({ username })
+        });
+        const data = await response.json();
+
+        // Si la réponse du serveur contient une erreur, on l'affiche directement
+        if (data.error) {
+            throw new Error(data.error);
         }
 
-        try {
-            // On appelle notre première fonction pour démarrer la tâche
-            const response = await fetch('/.netlify/functions/start-analysis', {
-                method: 'POST',
-                body: JSON.stringify({ username })
-            });
-            const data = await response.json();
-            
-            // On vérifie que la réponse contient bien un jobId et pas une erreur
-            if (data.error || !data.jobId) {
-                throw new Error(data.error || "La réponse du serveur est invalide.");
-            }
-            
-            // On a reçu le jobId, on commence à vérifier le statut toutes les 5 secondes
-            const shortJobId = data.jobId.substring(0, 8);
-            statusElement.textContent = `Analyse en arrière-plan démarrée... (ID: ${shortJobId})`;
-            pollingInterval = setInterval(() => checkStatus(data.jobId), 5000);
-
-        } catch (error) {
-            statusElement.textContent = `Erreur lors du lancement : ${error.message}`;
+        // Si la réponse ne contient ni erreur, ni jobId, c'est un problème
+        if (!data.jobId) {
+            throw new Error("La réponse du serveur est valide mais ne contient pas de Job ID.");
         }
-      }
+
+        const shortJobId = data.jobId.substring(0, 8);
+        statusElement.textContent = `Analyse en arrière-plan démarrée... (ID: ${shortJobId})`;
+        pollingInterval = setInterval(() => checkStatus(data.jobId), 5000);
+
+    } catch (error) {
+        statusElement.textContent = `Erreur lors du lancement : ${error.message}`;
+    }
+}
         
       async function checkStatus(jobId) {
         try {
