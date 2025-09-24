@@ -116,7 +116,7 @@
         }
       });
 
-      async function startAnalysis(username) {
+     async function startAnalysis(username) {
         // Réinitialiser l'interface
         statusElement.textContent = `Demande d'analyse pour "${username}" envoyée...`;
         resultsDisplay.classList.add('hidden');
@@ -132,8 +132,9 @@
             });
             const data = await response.json();
             
-            if (data.error) {
-                throw new Error(data.error);
+            // On vérifie que la réponse contient bien un jobId et pas une erreur
+            if (data.error || !data.jobId) {
+                throw new Error(data.error || "La réponse du serveur est invalide.");
             }
             
             // On a reçu le jobId, on commence à vérifier le statut toutes les 5 secondes
@@ -145,7 +146,7 @@
             statusElement.textContent = `Erreur lors du lancement : ${error.message}`;
         }
       }
-
+        
       async function checkStatus(jobId) {
         try {
             const response = await fetch(`/.netlify/functions/check-status?jobId=${jobId}`);
