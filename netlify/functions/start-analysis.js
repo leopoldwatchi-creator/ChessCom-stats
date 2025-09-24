@@ -1,13 +1,12 @@
 const { createClient } = require('@supabase/supabase-js');
 const { v4: uuidv4 } = require('uuid');
-const { Netlify } = require('netlify');
+// On met aussi la dépendance Netlify en commentaire car on ne l'utilise pas dans ce test
+// const { Netlify } = require('netlify');
 
 exports.handler = async function (event, context) {
-  // On ajoute un bloc try...catch pour attraper toutes les erreurs possibles
   try {
     const { username } = JSON.parse(event.body);
 
-    // Initialisation de Supabase
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     
     // 1. Créer une nouvelle tâche dans la base de données
@@ -20,30 +19,32 @@ exports.handler = async function (event, context) {
       throw new Error(`Erreur Supabase : ${insertError.message}`);
     }
 
-    // 2. Déclencher la fonction de fond de manière asynchrone
+    // 2. DÉCLENCHEMENT DE LA FONCTION DE FOND (DÉSACTIVÉ POUR LE TEST)
+    // =================================================================
+    /*
     const client = new Netlify({
        auth: { token: process.env.NETLIFY_API_TOKEN },
     });
     
-    // On déclenche la fonction de fond et on lui passe le jobId et le username
     await client.functions.invoke({
-        siteID: process.env.SITE_ID, // Netlify fournit automatiquement cette variable
+        siteID: process.env.SITE_ID,
         name: "process-analysis",
         body: JSON.stringify({ jobId, username }),
     });
+    */
+    console.log("TEST: Le déclenchement de la fonction de fond est désactivé.");
+    // =================================================================
 
     // 3. Renvoyer le jobId au frontend si tout s'est bien passé
     return {
       statusCode: 200,
-      body: JSON.stringify({ jobId }),
+      body: JSON.stringify({ jobId }), // C'est cette ligne que nous testons
     };
 
   } catch (error) {
-    // Si n'importe quelle étape ci-dessus échoue, on attrape l'erreur ici
     console.error("Erreur dans start-analysis:", error);
     return {
       statusCode: 500,
-      // On renvoie un message d'erreur clair au format JSON
       body: JSON.stringify({ error: error.message }),
     };
   }
