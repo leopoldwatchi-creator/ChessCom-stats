@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyseur Chess.com</title>
+    <style>
+      /* J'ai mis le CSS directement ici pour simplifier */
+      body { font-family: sans-serif; background-color: #333; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; }
+      .container { background-color: #262421; padding: 2em; border-radius: 10px; }
+      .hidden { display: none; }
+      .stat-item { display: flex; justify-content: space-between; padding: 0.5em 0; border-bottom: 1px solid #444; }
+      button { padding: 10px 15px; margin-left: 10px; cursor: pointer; }
+      input { padding: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+      <h1>Statistiques Chess.com</h1>
+      <div class="search-box">
+          <input type="text" id="username-input" placeholder="Entrez un pseudo..." value="Lwatch">
+          <button id="search-button">Analyser</button>
+      </div>
+      <h2 id="status"></h2>
+      <div id="results" class="hidden">
+        <div class="stat-item"><span>Parties totales :</span><span id="total-games"></span></div>
+        <div class="stat-item"><span>Rapides :</span><span id="rapid-games"></span></div>
+        <div class="stat-item"><span>Blitz :</span><span id="blitz-games"></span></div>
+        <div class="stat-item"><span>Bullet :</span><span id="bullet-games"></span></div>
+      </div>
+    </div>
+
+    <script>
+      const usernameInput = document.getElementById('username-input');
+      const searchButton = document.getElementById('search-button');
+      const statusElement = document.getElementById('status');
+      const resultsElement = document.getElementById('results');
+
+      searchButton.addEventListener('click', async () => {
+        const username = usernameInput.value.trim();
+        if (!username) return;
+
+        statusElement.textContent = `Analyse en cours pour "${username}"...`;
+        resultsElement.classList.add('hidden');
+
+        try {
+          // IMPORTANT : On appelle notre propre fonction, pas l'API de Chess.com
+          const response = await fetch(`/.netlify/functions/getStats?username=${username}`);
+          const data = await response.json();
+
+          if (data.error) throw new Error(data.error);
+          
+          // Affichage des résultats
+          statusElement.textContent = `Statistiques pour "${username}"`;
+          document.getElementById('total-games').textContent = data.total;
+          document.getElementById('rapid-games').textContent = data.rapid;
+          document.getElementById('blitz-games').textContent = data.blitz;
+          document.getElementById('bullet-games').textContent = data.bullet;
+          resultsElement.classList.remove('hidden');
+
+        } catch (error) {
+          statusElement.textContent = `Erreur : ${error.message}`;
+        }
+      });
+    </script>
+</body>
+</html>
